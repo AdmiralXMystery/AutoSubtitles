@@ -362,7 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-AutoSubtitles/Icons/
-AutoSubtitles/auto_subtitles_python_server/
-AutoSubtitles/ffmpeg
+/AutoSubtitles/Icons/
+/AutoSubtitles/auto_subtitles_python_server/
+/AutoSubtitles/ffmpeg
 
