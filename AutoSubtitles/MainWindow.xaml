@@ -1,0 +1,768 @@
+﻿<Window x:Class="AutoSubtitles.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net"
+        xmlns:wpf="http://materialdesigninxaml.net"
+        xmlns:local="clr-namespace:AutoSubtitles"
+        mc:Ignorable="d"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        WindowState="Maximized"
+        Title="{Binding WindowTitle}"
+        Height="640" Width="1280" Background="#1E1E1E" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <local:DoubleToStarGridLengthConverter x:Key="StarGridLengthConverter"/>
+        <Style x:Key="PremiereTabItemStyle" TargetType="TabItem">
+
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <!-- Текст внутри вкладки -->
+                        <TextBlock Text="{Binding}" FontSize="14" Margin="15, 8, 0, 15" HorizontalAlignment="Center"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Border" Background="Transparent" SnapsToDevicePixels="True">
+                            <ContentPresenter x:Name="ContentSite" ContentSource="Header" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Состояние: Вкладка выбрана (Активна) -->
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="#3FA9F5"/>
+                                <!-- Синий цвет Premiere -->
+                                <Setter TargetName="Border" Property="Background" Value="#1E1E1E"/>
+                                <!-- Цвет фона совпадает с окном -->
+                            </Trigger>
+                            <!-- Состояние: Мышь наведена на вкладку -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <!-- Состояние: Вкладка не выбрана -->
+                            <Trigger Property="IsSelected" Value="False">
+                                <Setter Property="Foreground" Value="#A5A5A5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Строка 0: Главное меню -->
+            <RowDefinition Height="Auto"/>
+            <!-- Строка 1: Шапка с вкладками на всю ширину -->
+            <RowDefinition Height="*"/>
+            <!-- Строка 2: Основной контент (Плеер + Правые панели) -->
+        </Grid.RowDefinitions>
+
+        <!-- МЕНЮ (Строка 0) -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="File" Height="18" FontSize="14" Margin="5">
+                <MenuItem Header="Open Media" FontSize="13" Click="Open_Click" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="Import JSON" FontSize="13" Click="ImportJson_Click" InputGestureText="Ctrl+J"/>
+                <MenuItem Header="Export" FontSize="13" Click="Export_Click" InputGestureText="Ctrl+E"/>
+            </MenuItem>
+            <MenuItem Header="Settings" Height="18" FontSize="14" Margin="5" Click="SettingsMenuItem_Click"/>
+        </Menu>
+
+        <!-- ШАПКА ВКЛАДОК НА ВСЮ ШИРИНУ (Строка 1) -->
+        <!-- Этот TabControl нужен ТОЛЬКО для отображения красивой шапки -->
+        <TabControl Grid.Row="1" 
+                    x:Name="headerTabControl" 
+                    Background="#161616" 
+                    BorderThickness="0" 
+                    Padding="0"
+                    ItemContainerStyle="{StaticResource PremiereTabItemStyle}">
+            <TabControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- Центрируем вкладки по горизонтали -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                </ItemsPanelTemplate>
+            </TabControl.ItemsPanel>
+
+            <!-- Сами вкладки. Контент внутри них пустой, так как он находится внизу -->
+            <TabItem Header="Subtitles"/>
+            <TabItem Header="Models"/>
+            <TabItem Header="Advanced AI"/>
+            <TabItem Header="Logs"/>
+        </TabControl>
+
+        <!-- ОСНОВНАЯ РАБОЧАЯ ОБЛАСТЬ (Строка 2) -->
+        <Grid Grid.Row="2" Background="#1E1E1E" x:Name="MainWorkArea">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ColVideo" Width="1.2*" MinWidth="200"/>
+                <ColumnDefinition x:Name="ColSplitter" Width="Auto"/>
+                <ColumnDefinition x:Name="ColSubs" Width="0.8*" MinWidth="200"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="RowVideo" Height="*"/>
+                <RowDefinition x:Name="RowSplitter" Height="0"/>
+                <RowDefinition x:Name="RowSubs" Height="0"/>
+            </Grid.RowDefinitions>
+
+
+
+            <!-- ЛЕВАЯ ЧАСТЬ: ВИДЕОПЛЕЕР (Никуда не исчезает при переключении) -->
+            <Grid Grid.Column="0" Margin="10" x:Name="PlayerGrid">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <MediaElement Name="myMediaElement" Grid.Row="0" LoadedBehavior="Manual" Stretch="Uniform" MediaOpened="myMediaElement_MediaOpened" />
+                <Grid Grid.Row="0" x:Name="WaveformGrid" Visibility="Collapsed">
+                    <Image x:Name="WaveformImage" 
+                            Stretch="Uniform"
+                            Height="200"
+                            VerticalAlignment="Center"
+                            />
+
+                    <!-- Маркер воспроизведения -->
+                    <Rectangle x:Name="PlaybackMarker" 
+                                Width="2" 
+                                Fill="Red"
+                                HorizontalAlignment="Left"
+                                Visibility="Collapsed"/>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,10">
+                    <!-- Кастомный индикатор прогресса: зелёная заливка только в распознанном отрезке -->
+                    <Grid Height="4" VerticalAlignment="Center" IsHitTestVisible="False" ClipToBounds="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding ProgressStartRatio, Converter={StaticResource StarGridLengthConverter}}"/>
+                            <ColumnDefinition Width="{Binding ProgressFillRatio, Converter={StaticResource StarGridLengthConverter}}"/>
+                            <ColumnDefinition Width="{Binding ProgressEndRatio, Converter={StaticResource StarGridLengthConverter}}"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Фон на всю ширину -->
+                        <Rectangle Grid.Column="0" Grid.ColumnSpan="3" Fill="#3E3E3E"/>
+                        <!-- Зелёная заливка только в распознанном отрезке -->
+                        <Rectangle Grid.Column="1" Fill="#00FF7F"/>
+                    </Grid>
+
+                    <Slider Name="timelineSlider" Minimum="0" Maximum="100" Background="Transparent"
+                            PreviewMouseDown="timelineSlider_PreviewMouseDown"
+                            PreviewMouseUp="timelineSlider_PreviewMouseUp"
+                            ValueChanged="timelineSlider_ValueChanged"
+                            Style="{StaticResource {x:Type Slider}}" Focusable="False">
+                        <Slider.Resources>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary" Color="#007ACC" />
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Hover" Color="#005999" />
+                        </Slider.Resources>
+                    </Slider>
+                </Grid>
+
+                <!-- Панель кнопок управления плеером -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="200"/>
+                        <!-- Колонка для кнопок слева -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- Колонка для времени и громкости справа -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ЛЕВЫЕ КНОПКИ (Прижаты к левому краю) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button Content="Start Transcription" Click="StartTranscription_Click" IsEnabled="{Binding CanStartTranscription, FallbackValue=False}" Margin="0,0,5,0" Padding="10,5" Background="#2D2D2D" BorderBrush="#3FA9F5"/>
+                        <Button Click="CancelTranscription_Click"
+        IsEnabled="{Binding CanCancelTranscription, FallbackValue=False}"
+        Margin="5,0" Padding="10,5">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Background" Value="#2D2D2D"/>
+                                    <Setter Property="BorderBrush" Value="Red"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Content" Value="Cancel"/>
+
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                                                </Border>
+
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="border" Property="Background" Value="#3D3D3D"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="border" Property="Background" Value="#1E1E1E"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCancelling}" Value="True">
+                                            <Setter Property="Content" Value="Cancelling…"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Name="playPauseButton" Content="Play" Click="PlayPause_Click" Focusable="False" Margin="5,0" Padding="10,5" Background="#2D2D2D" BorderBrush="#3FA9F5"/>
+                        <ComboBox ItemsSource="{Binding TranscriptionLanguages}" SelectedItem="{Binding SelectedLanguage}" DisplayMemberPath="DisplayName" Width="110" Height="30" Margin="5,0" Foreground="White" VerticalContentAlignment="Center">
+                            <ComboBox.Style>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
+                                    <Setter Property="IsEnabled" Value="True"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTranscribing}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.Style>
+                        </ComboBox>
+                        <Button Content="🔄" 
+                                Click="ToggleOrientation_Click" 
+                                Margin="5,0" 
+                                Padding="10,5" 
+                                Background="#2D2D2D" 
+                                BorderBrush="#3FA9F5"
+                                ToolTip="Switch the arrangement of the video and subtitles."/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,5,0">
+                        <TextBlock Name="timeLabel" Text="00:00.00 / 00:00.00" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold" Foreground="White"/>
+                        <Slider Name="volumeSlider" Width="80" Minimum="0" Maximum="1" Value="0.5" ValueChanged="volumeSlider_ValueChanged" Focusable="False">
+                            <Slider.Resources>
+                                <SolidColorBrush x:Key="MaterialDesign.Brush.Primary" Color="#007ACC" />
+                                <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Hover" Color="#005999" />
+                            </Slider.Resources>
+                        </Slider>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <GridSplitter x:Name="MainSplitter" Grid.Column="1" 
+                          Width="5" 
+                          HorizontalAlignment="Stretch" 
+                          VerticalAlignment="Stretch" 
+                          Background="#2D2D2D"
+                          ResizeBehavior="PreviousAndNext"
+                          ResizeDirection="Columns"/>
+            
+            
+            <TabControl x:Name="hiddenTabControl" 
+                        Grid.Column="2" 
+                        SelectedIndex="{Binding ElementName=headerTabControl, Path=SelectedIndex}" 
+                        BorderThickness="0" 
+                        Padding="0" 
+                        >
+                <TabControl.Resources>
+                    <!-- Полностью скрываем визуальные вкладки у этого TabControl, оставляя только вывод контента -->
+                    <Style TargetType="TabControl">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="TabControl">
+                                    <ContentPresenter ContentSource="SelectedContent" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </TabControl.Resources>
+                <!-- PreviewMouseLeftButtonDown="subtitlesGrid_PreviewMouseLeftButtonDown" -->
+                <!-- Вкладка 0: RealTime (Таблица субтитров) -->
+                <TabItem>
+                    <DataGrid Name="subtitlesGrid" AutoGenerateColumns="False" CanUserAddRows="False" 
+                              SelectionMode="Extended" Background="#1E1E1E" RowBackground="#1E1E1E" 
+                              BorderThickness="0" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" 
+                              ScrollViewer.CanContentScroll="True" SelectionUnit="FullRow"
+                              
+                              PreviewMouseRightButtonDown="subtitlesGrid_PreviewMouseRightButtonDown"
+                              ContextMenuOpening="subtitlesGrid_ContextMenuOpening"
+                              MouseRightButtonUp="subtitlesGrid_MouseRightButtonUp">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu Style="{StaticResource MaterialDesignContextMenu}">
+                                <MenuItem Header="Merge Rows" Click="MergeRows_Click"/>
+                                <MenuItem Header="Split Row" Click="SplitRow_Click"/>
+                                <MenuItem Header="Insert Empty Row" Click="InsertEmptyRow_Click"/>
+                                <MenuItem Header="Delete Row" Click="DeleteRow_Click" Foreground="Red"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#2D2D2D"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Padding" Value="5"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#1E1E1E"/>
+                                <Setter Property="FontSize" Value="13"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+                        <DataGrid.CellStyle>
+                            <Style TargetType="DataGridCell">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="FontSize" Value="13"/>
+                                <Setter Property="Padding" Value="10,6,10,6"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="DataGridCell">
+                                            <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                                                <ContentPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#3F3F46"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="Background" Value="#1A365D"/>
+                                        <Setter Property="Foreground" Value="#3FA9F5"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.CellStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Time" Binding="{Binding TimeRange}" IsReadOnly="True" Width="140"/>
+                            <DataGridTextColumn x:Name="SpeakerColumn"
+                                                Header="Speaker"
+                                                Binding="{Binding Speaker, Mode=TwoWay}"
+                                                Width="110"
+                                                Visibility="Collapsed">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="5"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                        <Setter Property="Background" Value="#2D2D2D"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="5"/>
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Subtitle Text" Binding="{Binding Text, Mode=TwoWay}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="5"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                        <Setter Property="Background" Value="#2D2D2D"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="AcceptsReturn" Value="True"/>
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+
+                <TabItem>
+                    <Grid Background="#1E1E1E">
+                        <Grid.RowDefinitions>
+                            <!-- Верхняя шапка для тумблера бэкендов -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- Основная скроллируемая область контента -->
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- ВЕРХНЯЯ ПАНЕЛЬ ПЕРЕКЛЮЧЕНИЯ БЭКЕНДОВ -->
+                        <Border Grid.Row="0" Background="#161616" Padding="15,12" BorderThickness="0,0,0,1" BorderBrush="#2D2D2D">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="Whisper.Net" FontSize="13" FontWeight="Medium" Foreground="White" VerticalAlignment="Center" Margin="15,0"/>
+                                <ToggleButton Style="{StaticResource MaterialDesignSwitchToggleButton}" 
+                              IsChecked="{Binding ModelType, Mode=TwoWay}"
+                              Background="Blue" VerticalAlignment="Center"/>
+                                <TextBlock Text="Python Backend" FontSize="13" FontWeight="Medium" Foreground="White" VerticalAlignment="Center" Margin="15,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ОСНОВНОЙ КОНТЕНТ ВКЛАДКИ -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20">
+                            <StackPanel MaxWidth="750" HorizontalAlignment="Stretch">
+
+                                <TextBlock Text="AI Engine Neural Models" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="20"/>
+
+                                <!-- КАРТОЧКА 1: Модели Whisper.Net (C#) -->
+                                <GroupBox Header="Whisper.Net Core Models (Offline .bin)" Margin="0,0,0,20" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="200"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <TextBlock Text="GGML Model" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Models must be downloaded locally to execute offline transcription" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding GGML_Models}" SelectedItem="{Binding SelectedModel}" 
+                                      Width="190" Height="32" VerticalContentAlignment="Center" HorizontalAlignment="Left" Foreground="White">
+                                                <ComboBox.Style>
+                                                    <Style TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
+                                                        <Setter Property="IsEnabled" Value="True"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedModel.IsDownloading}" Value="True">
+                                                                <Setter Property="IsEnabled" Value="False"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ComboBox.Style>
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                            <TextBlock x:Name="DownloadedLabel" Text=" (Downloaded)" Foreground="#00FF7F" FontSize="11" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDownloaded}" Value="True">
+                                                                <Setter TargetName="DownloadedLabel" Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+
+                                            <Button Grid.Column="2" Content="Download" Click="DownloadButton_Click" 
+                                                    IsEnabled="{Binding SelectedModel.CanBeDownloaded, FallbackValue=False}" 
+                                                    Width="100" Height="32" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                        </Grid>
+
+                                        <!-- Прогресс-бар загрузки (Интегрирован внутрь карточки) -->
+                                        <StackPanel Margin="0,15,0,5">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedModel.IsDownloading}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Grid.Column="0" Height="24">
+                                                    <ProgressBar Value="{Binding SelectedModel.DownloadProgress, Mode=OneWay, FallbackValue=0}" Maximum="100" Style="{x:Null}" Background="#141414" Foreground="#512BD4"/>
+                                                    <TextBlock Text="{Binding SelectedModel.DownloadStatusText}" Foreground="White" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <Button Grid.Column="1" Content="Cancel" Click="CancelButton_Click" Width="70" Height="24" Padding="0" FontSize="11" Margin="10,0,0,0" Style="{StaticResource MaterialDesignFlatButton}" Foreground="Red"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- КАРТОЧКА 2: Серверные модели Faster-Whisper (Python) -->
+                                <GroupBox Header="Faster-Whisper Server Models (Python API)" Margin="0,0,0,20" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <TextBlock Text="Faster-Whisper" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Python server will automatically request weights from HuggingFace cache" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding FasterWhisper_Models}" SelectedItem="{Binding FasterWhisper_SelectedModel}" 
+                                      Width="190" Height="32" VerticalContentAlignment="Center" Foreground="White" ItemTemplateSelector="{x:Null}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                            <TextBlock x:Name="DownloadedLabel" Text=" (Cached)" Foreground="#3FA9F5" FontSize="11" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDownloaded}" Value="True">
+                                                                <Setter TargetName="DownloadedLabel" Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+                                <!-- КАРТОЧКА 3: Режим диаризации (PyAnnote) -->
+                                <GroupBox Header="Diarization Pipeline (PyAnnote)" Margin="0,0,0,10" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <TextBlock Text="Speaker Tracking Mode" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Enables or disables pyannote.audio machine learning diarization pipeline" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="OFF" FontSize="12" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <ToggleButton Style="{StaticResource MaterialDesignSwitchToggleButton}" 
+                                              IsChecked="{Binding DiarizationMode, Mode=TwoWay}" Background="Blue" VerticalAlignment="Center"/>
+                                                <TextBlock Text="ON" FontSize="12" FontWeight="Bold" Foreground="#3FA9F5" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+                <!-- Вкладка 3: Advanced AI Configurations (Обновленная) -->
+                <TabItem>
+                    <TabItem.Resources>
+                        <!-- Локальный конвертер для отображения и ввода 'inf' вместо бесконечности -->
+                        <local:InfinityConverter x:Key="InfinityConverter"/>
+                    </TabItem.Resources>
+
+                    <Grid Background="#1E1E1E">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                            <StackPanel MaxWidth="750" HorizontalAlignment="Stretch">
+
+
+
+                                <!-- КАРТОЧКА 0: Beam Size Faster Whisper-->
+                                <GroupBox Header="Beam Size for Faster-Whisper" Margin="0,0,0,20" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="50"/>
+                                                <ColumnDefinition Width="3*"/>
+                                                <ColumnDefinition Width="50"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                <TextBlock Text="Beam Size" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Higher values improve accuracy at the cost of speed (1 - 5)" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <!-- Текущее значение слева -->
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="{Binding MainWindow_AppSettings.beam_size}" 
+                                                       Foreground="#3FA9F5" FontWeight="SemiBold" 
+                                                       VerticalAlignment="Center" 
+                                                       HorizontalAlignment="Center"/>
+
+                                            <!-- Слайдер -->
+                                            <Slider Grid.Column="2"
+                                                    Minimum="1"
+                                                    Maximum="5" 
+                                                    TickFrequency="1"
+                                                    IsSnapToTickEnabled="True"
+                                                    Value="{Binding MainWindow_AppSettings.beam_size, Mode=TwoWay}" 
+                                                    VerticalAlignment="Center"/>
+
+                                            <!-- Максимальное значение справа -->
+                                            <TextBlock Grid.Column="3" Text="5" Foreground="Gray" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+
+                                <!-- КАРТОЧКА 1: Диаризация и Спикеры -->
+                                <GroupBox Header="Speaker Separation &amp; Phrasing" Margin="0,0,0,20" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="50"/>
+                                                <!-- Текущее значение СЛЕВА -->
+                                                <ColumnDefinition Width="3*"/>
+                                                <!-- Слайдер -->
+                                                <ColumnDefinition Width="50"/>
+                                                <!-- Максимальное значение СПРАВА -->
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                <TextBlock Text="Max Phrase Pause" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Maximum allowable silence (seconds) inside a single speaker block" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <!-- Текущее значение слева -->
+                                            <TextBlock Grid.Column="1" 
+                                       Text="{Binding MainWindow_AppSettings.max_pause, StringFormat={}{0:F1}s}" 
+                                       Foreground="#3FA9F5" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                                            <!-- Слайдер -->
+                                            <Slider Grid.Column="2" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                    Value="{Binding MainWindow_AppSettings.max_pause, Mode=TwoWay}" VerticalAlignment="Center"/>
+
+                                            <!-- Максимальное значение справа -->
+                                            <TextBlock Grid.Column="3" Text="3.0s" Foreground="Gray" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- КАРТОЧКА 2: Фильтрация голоса (Voice Activity Detector) -->
+                                <GroupBox Header="Voice Activity Detector (Silero VAD)" Margin="0,0,0,10" Foreground="White" BorderBrush="#2D2D2D">
+                                    <StackPanel Margin="10">
+
+                                        <!-- Главный тумблер включения VAD -->
+                                        <Grid Margin="0,5,0,15">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                                <TextBlock Text="Enable Audio VAD Filtering" Foreground="White" FontSize="12" FontWeight="Medium"/>
+                                                <TextBlock Text="Pre-filters background noise and dead silence to eliminate AI hallucinations" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource MaterialDesignSwitchToggleButton}" 
+                                          IsChecked="{Binding MainWindow_AppSettings.vad_filter, Mode=TwoWay}" Background="Blue" VerticalAlignment="Center"/>
+                                        </Grid>
+
+                                        <!-- Контейнер параметров VAD (Блокируется автоматически, если VAD выключен) -->
+                                        <StackPanel IsEnabled="{Binding MainWindow_AppSettings.vad_filter}">
+                                            <Separator Background="#2D2D2D" Margin="0,0,0,15"/>
+
+                                            <!-- Порог чувствительности речи (Threshold) -->
+                                            <Grid Margin="0,5,0,15">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="2*"/>
+                                                    <ColumnDefinition Width="50"/>
+                                                    <!-- Текущее значение СЛЕВА -->
+                                                    <ColumnDefinition Width="3*"/>
+                                                    <!-- Слайдер -->
+                                                    <ColumnDefinition Width="50"/>
+                                                    <!-- Максимальное значение СПРАВА -->
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                    <TextBlock Text="Speech Probability Threshold" Foreground="White" FontSize="12"/>
+                                                    <TextBlock Text="Higher value means stricter speech verification (0.1 - 0.9)" Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                                </StackPanel>
+
+                                                <!-- Текущее значение слева -->
+                                                <TextBlock Grid.Column="1" 
+                                           Text="{Binding MainWindow_AppSettings.vad_threshold, StringFormat={}{0:F2}}" 
+                                           Foreground="#00FF7F" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                                                <!-- Слайдер -->
+                                                <Slider Grid.Column="2" Minimum="0.1" Maximum="0.9" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                        Value="{Binding MainWindow_AppSettings.vad_threshold, Mode=TwoWay}" VerticalAlignment="Center"/>
+
+                                                <!-- Максимальное значение справа -->
+                                                <TextBlock Grid.Column="3" Text="0.90" Foreground="Gray" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </Grid>
+
+                                            <!-- Детальная сетка параметров VAD в миллисекундах (TextBox-ы) -->
+                                            <UniformGrid Columns="2">
+
+                                                <!-- Min Silence Duration -->
+                                                <StackPanel Margin="0,5,15,5">
+                                                    <TextBlock Text="Min Silence Duration (ms)" Foreground="LightGray" FontSize="11" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding MainWindow_AppSettings.min_silence_duration_ms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                             Style="{StaticResource MaterialDesignTextBox}" Background="#141414" Foreground="White" Padding="6,4" BorderThickness="1" BorderBrush="#2D2D2D" FontFamily="Consolas"/>
+                                                </StackPanel>
+
+                                                <!-- Min Speech Duration -->
+                                                <StackPanel Margin="15,5,0,5">
+                                                    <TextBlock Text="Min Speech Duration (ms)" Foreground="LightGray" FontSize="11" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding MainWindow_AppSettings.min_speech_duration_ms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                             Style="{StaticResource MaterialDesignTextBox}" Background="#141414" Foreground="White" Padding="6,4" BorderThickness="1" BorderBrush="#2D2D2D" FontFamily="Consolas"/>
+                                                </StackPanel>
+
+                                                <!-- Speech Padding -->
+                                                <StackPanel Margin="0,15,15,5">
+                                                    <TextBlock Text="Speech Padding (ms)" Foreground="LightGray" FontSize="11" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding MainWindow_AppSettings.speech_pad_ms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                             Style="{StaticResource MaterialDesignTextBox}" Background="#141414" Foreground="White" Padding="6,4" BorderThickness="1" BorderBrush="#2D2D2D" FontFamily="Consolas"/>
+                                                </StackPanel>
+
+                                                <!-- Max Speech Duration (С поддержкой строки 'inf') -->
+                                                <StackPanel Margin="15,15,0,5">
+                                                    <TextBlock Text="Max Continuous Speech (sec)" Foreground="LightGray" FontSize="11" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding MainWindow_AppSettings.max_speech_duration_s, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource InfinityConverter}}" 
+                                             Style="{StaticResource MaterialDesignTextBox}" Background="#141414" Foreground="White" Padding="6,4" BorderThickness="1" BorderBrush="#2D2D2D" FontFamily="Consolas"/>
+                                                </StackPanel>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- КНОПКА DEFAULT (Сброс к начальным значениям) -->
+                                <Button Content="Reset to Default" 
+                                        Click="ResetToDefault_Click" 
+                                        Style="{StaticResource MaterialDesignFlatButton}" 
+                                        Foreground="Red" 
+                                        Padding="10,5"/>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+
+                <!-- Вкладка 4: Logs -->
+                <TabItem>
+                    <Grid Background="#1E1E1E">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Local Python server logs" 
+                                   Foreground="Gray" FontSize="12" HorizontalAlignment="Center" 
+                                   Margin="10,5,10,0" FontWeight="Medium"/>
+
+                        <TextBox Grid.Row="1" 
+                                 x:Name="ServerLogsTextBox" 
+                                 IsReadOnly="True" 
+                                 TextWrapping="Wrap" 
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto" 
+                                 Background="#161616" 
+                                 Foreground="#00FF7F" 
+                                 FontFamily="Consolas" 
+                                 FontSize="12" 
+                                 Margin="10" 
+                                 Padding="8"
+                                 BorderThickness="1" 
+                                 BorderBrush="#2D2D2D"/>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</Window>
+
+
+

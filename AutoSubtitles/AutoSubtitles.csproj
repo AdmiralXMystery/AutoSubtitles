@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+	<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+	<ApplicationIcon>Icons\subtitle.ico</ApplicationIcon>
+	<Authors>Admiral Mystery</Authors>
+	<Product>AutoSubtitles AI</Product>
+	<Copyright>Copyright © 2026 Admiral Mystery Production. All rights reserved.</Copyright>
+	<Version>1.0.0</Version>
+	<AssemblyVersion>1.0.0.0</AssemblyVersion>
+	<FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Controls\**" />
+    <Compile Remove="Views\**" />
+    <EmbeddedResource Remove="Controls\**" />
+    <EmbeddedResource Remove="Views\**" />
+    <None Remove="Controls\**" />
+    <None Remove="Views\**" />
+    <Page Remove="Controls\**" />
+    <Page Remove="Views\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.2" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="NAudio.Core" Version="2.3.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+  </ItemGroup>
+
+
+	<ItemGroup>
+		<Content Include="auto_subtitles_python_server\**\*.*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="ffmpeg\**\*.*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+</Project>
