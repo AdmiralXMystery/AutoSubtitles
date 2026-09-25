@@ -363,6 +363,11 @@ MigrationBackup/
 FodyWeavers.xsd
 
 /AutoSubtitles/Icons/
-/AutoSubtitles/auto_subtitles_python_server/
 /AutoSubtitles/ffmpeg
+
+/AutoSubtitles/auto_subtitles_python_server/_internal/
+/AutoSubtitles/auto_subtitles_python_server/*.exe
+/AutoSubtitles/auto_subtitles_python_server/*.spec
+/AutoSubtitles/auto_subtitles_python_server/build/
+/AutoSubtitles/auto_subtitles_python_server/dist/
 
