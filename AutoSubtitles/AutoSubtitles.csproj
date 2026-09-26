@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
 	<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-	<ApplicationIcon>Icons\subtitle.ico</ApplicationIcon>
+	<ApplicationIcon>Icons\cam_sub_icon.ico</ApplicationIcon>
 	<Authors>Admiral Mystery</Authors>
 	<Product>AutoSubtitles AI</Product>
 	<Copyright>Copyright © 2026 Admiral Mystery Production. All rights reserved.</Copyright>
@@ -19,12 +19,16 @@
   <ItemGroup>
     <Compile Remove="Controls\**" />
     <Compile Remove="Views\**" />
+    <Compile Remove="Новая папка\**" />
     <EmbeddedResource Remove="Controls\**" />
     <EmbeddedResource Remove="Views\**" />
+    <EmbeddedResource Remove="Новая папка\**" />
     <None Remove="Controls\**" />
     <None Remove="Views\**" />
+    <None Remove="Новая папка\**" />
     <Page Remove="Controls\**" />
     <Page Remove="Views\**" />
+    <Page Remove="Новая папка\**" />
   </ItemGroup>
 
   <ItemGroup>

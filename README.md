@@ -2,6 +2,12 @@
 
 **AutoSubtitles** is a desktop application for Windows (WPF, C#) designed for automatic transcription of video and audio into subtitles, with support for speaker diarization, editing, and export.
 
+---
+
+![Main Window Screenshot](screenshots/main_window.png)
+
+---
+
 ## Features
 
 - 🎙️ **Automatic transcription** of video and audio files using local AI models:
@@ -60,3 +66,6 @@ cd auto_subtitles_python_server
 pip install -r requirements.txt
 ```
 Copy the build command from the build_command.txt file and run it.
+
+## Authors
+AdmiralXMystery
